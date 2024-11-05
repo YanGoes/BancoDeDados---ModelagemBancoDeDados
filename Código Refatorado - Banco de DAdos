@@ -1,0 +1,143 @@
+const sqlite3 = require('sqlite3').verbose();
+const winston = require('winston');
+
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    transports: [
+        new winston.transports.File({ filename: 'error.log', level: 'error' }),
+        new winston.transports.Console()
+    ]
+});
+
+function connectDb() {
+    return new sqlite3.Database('example.db', (err) => {
+        if (err) {
+            logger.error(err.message);
+        }
+        logger.info('Conectado ao banco de dados SQLite.');
+    });
+}
+
+function createTable(db) {
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        age INTEGER NOT NULL CHECK(age > 0),
+        email TEXT NOT NULL UNIQUE
+    )`, (err) => {
+        if (err) {
+            logger.error(err.message);
+        }
+    });
+}
+
+function validateUserInput(name, age, email) {
+    if (!name || typeof name !== 'string') throw new Error('Nome inválido.');
+    if (!age || typeof age !== 'number' || age <= 0) throw new Error('Idade inválida.');
+    if (!email || typeof email !== 'string' || !email.includes('@')) throw new Error('Email inválido.');
+}
+
+function handleError(err) {
+    logger.error(err.message);
+}
+
+function insertUser(db, name, age, email) {
+    try {
+        validateUserInput(name, age, email);
+        const sql = `INSERT INTO users (name, age, email) VALUES (?, ?, ?)`;
+        db.run(sql, [name, age, email], function(err) {
+            if (err) {
+                handleError(err);
+            } else {
+                logger.info(`Usuário adicionado com ID: ${this.lastID}`);
+            }
+        });
+    } catch (err) {
+        handleError(err);
+    }
+}
+
+function fetchUsers(db) {
+    const sql = `SELECT * FROM users`;
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            handleError(err);
+            return;
+        }
+        logger.info("Usuários cadastrados:");
+        rows.forEach((row) => {
+            logger.info(`ID: ${row.id}, Nome: ${row.name}, Idade: ${row.age}, Email: ${row.email}`);
+        });
+    });
+}
+
+function updateUser(db, userId, name = null, age = null, email = null) {
+    let updates = [];
+    let params = [];
+
+    if (name) {
+        updates.push(`name = ?`);
+        params.push(name);
+    }
+    if (age) {
+        updates.push(`age = ?`);
+        params.push(age);
+    }
+    if (email) {
+        updates.push(`email = ?`);
+        params.push(email);
+    }
+
+    if (updates.length > 0) {
+        const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+        params.push(userId);
+
+        db.run(sql, params, function(err) {
+            if (err) {
+                handleError(err);
+            } else {
+                logger.info(`Usuário com ID ${userId} atualizado.`);
+            }
+        });
+    }
+}
+
+function deleteUser(db, userId) {
+    const sql = `DELETE FROM users WHERE id = ?`;
+    db.run(sql, userId, function(err) {
+        if (err) {
+            handleError(err);
+        } else {
+            logger.info(`Usuário com ID ${userId} removido.`);
+        }
+    });
+}
+
+function main() {
+    const db = connectDb();
+    
+    createTable(db);
+
+    insertUser(db, 'Alice', 30, 'alice@example.com');
+    insertUser(db, 'Bob', 25, 'bob@example.com');
+
+    fetchUsers(db);
+
+    updateUser(db, 1, null, 31);
+
+    fetchUsers(db);
+
+    deleteUser(db, 2);
+
+    fetchUsers(db);
+
+    db.close((err) => {
+        if (err) {
+            handleError(err);
+        }
+        logger.info('Conexão com o banco de dados fechada.');
+    });
+}
+
+main();
