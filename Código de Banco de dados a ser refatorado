@@ -1,0 +1,117 @@
+const sqlite3 = require('sqlite3').verbose();
+
+function connectDb() {
+    return new sqlite3.Database('example.db', (err) => {
+        if (err) {
+            console.error(err.message);
+        }
+        console.log('Conectado ao banco de dados SQLite.');
+    });
+}
+
+function createTable(db) {
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        age INTEGER NOT NULL,
+        email TEXT NOT NULL UNIQUE
+    )`, (err) => {
+        if (err) {
+            console.error(err.message);
+        }
+    });
+}
+
+function insertUser(db, name, age, email) {
+    const sql = `INSERT INTO users (name, age, email) VALUES (?, ?, ?)`;
+    db.run(sql, [name, age, email], function(err) {
+        if (err) {
+            console.error(`Erro: ${err.message}`);
+        } else {
+            console.log(`Usuário adicionado com ID: ${this.lastID}`);
+        }
+    });
+}
+
+function fetchUsers(db) {
+    const sql = `SELECT * FROM users`;
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            throw err;
+        }
+        console.log("Usuários cadastrados:");
+        rows.forEach((row) => {
+            console.log(`ID: ${row.id}, Nome: ${row.name}, Idade: ${row.age}, Email: ${row.email}`);
+        });
+    });
+}
+
+function updateUser(db, userId, name = null, age = null, email = null) {
+    let updates = [];
+    let params = [];
+
+    if (name) {
+        updates.push(`name = ?`);
+        params.push(name);
+    }
+    if (age) {
+        updates.push(`age = ?`);
+        params.push(age);
+    }
+    if (email) {
+        updates.push(`email = ?`);
+        params.push(email);
+    }
+
+    if (updates.length > 0) {
+        const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+        params.push(userId);
+
+        db.run(sql, params, function(err) {
+            if (err) {
+                console.error(err.message);
+            } else {
+                console.log(`Usuário com ID ${userId} atualizado.`);
+            }
+        });
+    }
+}
+
+function deleteUser(db, userId) {
+    const sql = `DELETE FROM users WHERE id = ?`;
+    db.run(sql, userId, function(err) {
+        if (err) {
+            console.error(err.message);
+        } else {
+            console.log(`Usuário com ID ${userId} removido.`);
+        }
+    });
+}
+
+function main() {
+    const db = connectDb();
+    
+    createTable(db);
+
+    insertUser(db, 'Alice', 30, 'alice@example.com');
+    insertUser(db, 'Bob', 25, 'bob@example.com');
+
+    fetchUsers(db);
+
+    updateUser(db, 1, null, 31);
+
+    fetchUsers(db);
+
+    deleteUser(db, 2);
+
+    fetchUsers(db);
+
+    db.close((err) => {
+        if (err) {
+            console.error(err.message);
+        }
+        console.log('Conexão com o banco de dados fechada.');
+    });
+}
+
+main();
