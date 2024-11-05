@@ -1,3 +1,5 @@
+LINK DE ONDE PEGUEI O CÓDIGO: https://github.com/EricLand-cod/Codigos-JS-PY-C-C-
+
 const sqlite3 = require('sqlite3').verbose();
 
 function connectDb() {
